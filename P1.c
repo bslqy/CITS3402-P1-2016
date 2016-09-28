@@ -25,7 +25,7 @@ void readMatrix(char* fileName)
     if (ch == ' ') col++;
     ch = fgetc(fp);
   }
-  col++; //
+  col++; // 
 
   double** jz = malloc(row * sizeof(double*)); //Allocate spaces
   for (i = 0; i < row; i++)
