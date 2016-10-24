@@ -43,6 +43,12 @@ int NUM_OF_BLOCK = 0;       //  TOTAL NUMBER OF BLOCK
 int SIZE_OF_COLLECTION = 0;     // SIZE OF SET FOR COMBINATION CALCULATION N choose M
 								//int SIZE_OF_COMBINATION = 1;    // SIZE OF COMBINATION nCm
 
+								/*
+								int queue[4400] = {0} ;           // THE TEMPERORY ARRAY THAT STORE THE INSTANCE OF THE CONBINATION
+								int result[M] = {0};        // THE ARRAY THAT SAVE THE RESULT OF ONE COMBINATION
+								int top = 0;                // THE POINTER OF RECURSION
+								*/
+
 void readKey(char* fileName) {
 
 	KEYS = malloc(4400 * sizeof(long long));
@@ -99,7 +105,7 @@ int* collection(double* one_column, int start, int row_size) {
 	collection_for_one_row[0] = start;
 
 	int i =start;
-//#pragma omp parallel for firstprivate(i) shared(collection_for_one_row) 
+//#pragma omp parallel for firstprivate(i) shared(collection_for_one_row)
 	for (i; i < row_size - 1; i++) {
 		// START is the benchmark of the dia checking operation
 		//i.e. fixing START and find the DIA down the row
@@ -323,7 +329,7 @@ double** readMatrix(char* fileName) {
 
 int main(void) {
 
-	
+
 
 	clock_t begin = clock();
 
@@ -331,81 +337,53 @@ int main(void) {
 	double** jz = readMatrix("data.txt");
 
 	int i = 0;
-	int j = 0;
-	#pragma omp parallel for lastprivate(NUM_OF_BLOCK) 
-		for (i = 0; i < 499; i++) {  
+	#pragma omp parallel for firstprivate(i)
+		for (i = 0; i < 499; i++) {  //423 & 499 broken
 
 		printf("THIS IS COLUMN %d\n", i);
 
 		double*c = readCol(jz, i, 4400);
-		//int j = 0;
-
-		//#pragma omp parallel for firstprivate(j) shared(c)
+		int j = 0;
+		 #pragma omp parallel for firstprivate(j)
 		for ( j = 0; j < 4400; j++) {
 
 			// printf("This is fixed row %d !!!!!!!!!!\n",j);
-
-			 int* one_collection = collection(c, j, 4400);
-
+			int* one_collection = collection(c, j, 4400);
 
 			// MODIFY THE DYMANIC ALLOCATION OF SPACES (SIZE_OF_COMBINATION) IN combNonRec() function.
 
-			 
-				 if (get_combination_size(SIZE_OF_COLLECTION, M) >= 4) {
-					 //GET THE 2D-ARRAY OF COMBINATION
+			if (get_combination_size(SIZE_OF_COLLECTION, M) >= 4) {
+				//GET THE 2D-ARRAY OF COMBINATION
+				int** rrr = combNonRec(one_collection, SIZE_OF_COLLECTION, M);
 
-					 int** rrr = combNonRec(one_collection, SIZE_OF_COLLECTION, M);
+				for (int ii = 0; ii < get_combination_size(SIZE_OF_COLLECTION, M); ii++) {
+					create_Block(rrr[ii], i);  // first arg: int[] ; second arg: col_number;
+					add_To_Block_Collection();
+					// printf("\n");
+				}
 
-					 int ii = 0;
-					 //#pragma omp parallel for private(ii)
-					 for (ii = 0; ii < get_combination_size(SIZE_OF_COLLECTION, M); ii++) {
-
-						 create_Block(rrr[ii], i);  // first arg: int[] ; second arg: col_number;
-						 add_To_Block_Collection();
-						 // printf("\n");
-					 }
-
-					 free(rrr);
+				free(rrr);
+			}
 
 
-				 }
-
-				 free(one_collection);
-
-			 
+			 free(one_collection);
 		}
 
 		//OpenMP for j
-
-
-
 		free(c);
 	}
-		
 	// OpenMP for i
 	collision();
-	
+
 
 	clock_t end = clock();
 	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 	printf("Total time spent : %f\n", time_spent);
 
-	printf("NUMBER OF BLOCK  is %d", NUM_OF_BLOCK);
 
 
-	
 
-	/*
-	int i = 0;
-#pragma omp parallel for lastprivate(SIZE_OF_COLLECTION)
-	for (i = 0; i < 1000; i++)
-	{
-		SIZE_OF_COLLECTION = i;
-		printf("The value of size is %d\n", SIZE_OF_COLLECTION);
-	}
 
-	printf("outside the parallel region %d", SIZE_OF_COLLECTION);
-	*/
 }
 
 
