@@ -7,13 +7,12 @@
 */
 
 
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
 #include <math.h>
-//#include <omp.h>
+#include <omp.h>
 
 #define MAX 1000000  //one row of double = sizeof(Double) *4400
 #define ROW_SIZE 4400
@@ -31,23 +30,57 @@ struct block {
 	long long signature;
 };
 
-long long* KEYS;   //GLOBAL KEY STORAGE
+/** individual DIA_SET **/
+struct DIA_SET {
+	int* collection;
+	int col_index;
+	int size;
+};
 
+long long* KEYS;   //GLOBAL KEY STORAGE
 
 				   //  GLOBAL VARIAABLES USED FOR BLOCK CREATION
 struct block b;             //  RECYCLCABLE SINGLE BLOCK
-struct block* Big_Block;    //  COLLECTION OF ALL BLOCK
+struct block* Big_Block;    //  THE COLLECTION OF ALL BLOCK
 int NUM_OF_BLOCK = 0;       //  TOTAL NUMBER OF BLOCK
 
-							//  GLOBAL VARIABLE USED FOR COMBINATION
-int SIZE_OF_COLLECTION = 0;     // SIZE OF SET FOR COMBINATION CALCULATION N choose M
-								//int SIZE_OF_COMBINATION = 1;    // SIZE OF COMBINATION nCm
 
-								/*
-								int queue[4400] = {0} ;           // THE TEMPERORY ARRAY THAT STORE THE INSTANCE OF THE CONBINATION
-								int result[M] = {0};        // THE ARRAY THAT SAVE THE RESULT OF ONE COMBINATION
-								int top = 0;                // THE POINTER OF RECURSION
-								*/
+
+							//  GLOBAL VARIABLE USED FOR DIA SET
+int SIZE_OF_COLLECTION = 0;     // SIZE OF SET FOR COMBINATION CALCULATION N choose M
+struct DIA_SET one_dia_set;
+struct DIA_SET* dias;			//  THE COLLECTION OF ALL DIA SET
+int NUM_OF_DIA_SET = 0;
+
+void add_to_dia_set(int* collection, int col_number, int size)
+{
+
+	if (NUM_OF_DIA_SET == 0) {
+		if ((dias = (malloc(sizeof(struct DIA_SET)))) != NULL) {
+
+			one_dia_set.col_index = col_number;
+			one_dia_set.collection = collection;
+			one_dia_set.size = size;
+
+			dias[NUM_OF_DIA_SET] = one_dia_set; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION , b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
+			NUM_OF_DIA_SET++;
+		}
+
+
+	}
+
+	else {
+		//SEQUENTIAL ACCESS
+		NUM_OF_DIA_SET++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
+		dias = realloc(dias, NUM_OF_DIA_SET * sizeof(struct DIA_SET));
+		one_dia_set.col_index = col_number;
+		one_dia_set.collection = collection;
+		one_dia_set.size = size;
+		dias[NUM_OF_DIA_SET - 1] = one_dia_set; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
+
+
+	}
+}
 
 void readKey(char* fileName) {
 
@@ -97,15 +130,15 @@ double* readCol(double** jz, int col_number, int row_size) {
 
 
 /** use to return a collection of DIA neighbours given a fixed row (start)  */
-int* collection(double* one_column, int start, int row_size) {
+void collection(double* one_column, int col_num, int start, int row_size) {
 	// Put itself in a collection e.g. {1}
 	int size_of_set = 1;
 	int* collection_for_one_row = malloc(size_of_set * sizeof(int));
 
 	collection_for_one_row[0] = start;
 
-	int i =start;
-//#pragma omp parallel for firstprivate(i) shared(collection_for_one_row)
+	int i = start;
+	//#pragma omp parallel for firstprivate(i) shared(collection_for_one_row)
 	for (i; i < row_size - 1; i++) {
 		// START is the benchmark of the dia checking operation
 		//i.e. fixing START and find the DIA down the row
@@ -119,21 +152,13 @@ int* collection(double* one_column, int start, int row_size) {
 		}
 	}
 
-	SIZE_OF_COLLECTION = size_of_set;  // MODIFY THE ARRAY SIZE N FOR COMBINATION.
-									   // printf("Inside the collection function, what is the SIZE_OF_COLLECTION? %d\n",SIZE_OF_COLLECTION);
+	//SIZE_OF_COLLECTION = size_of_set;  // MODIFY THE ARRAY SIZE N FOR COMBINATION.
+	// printf("Inside the collection function, what is the SIZE_OF_COLLECTION? %d\n",SIZE_OF_COLLECTION);
+	if (size_of_set >= 4)
+	{
+		add_to_dia_set(collection_for_one_row, i, size_of_set);
+	}
 
-
-									   /*
-									   if(size_of_set > 4){
-									   for(int i=0;i<size_of_set;i++){
-									   printf("%d ",collection_for_one_row[i]);
-									   }
-									   printf("\n");
-
-									   }
-
-									   */
-	return collection_for_one_row;
 }
 
 
@@ -192,22 +217,21 @@ int** combNonRec(int collect[], int sizeOfColl, int sizeOut) {
 
 	free(p);
 
-/*
+	/*
 	for (int i = 0; i<size_of_combination; i++)
 	{
-		printf("List %d:\n", i);
-		for (int j = 0; j<4; j++)
-		{
-			printf("%d ", finalR[i][j]);
-		}
-		printf("\n");
-		printf("\n");
+	printf("List %d:\n", i);
+	for (int j = 0; j<4; j++)
+	{
+	printf("%d ", finalR[i][j]);
+	}
+	printf("\n");
+	printf("\n");
 	}
 
 	*/
 	return finalR;
 }
-
 
 
 /** RECYCLING THE GLOBAL STRUCT B **/
@@ -251,13 +275,13 @@ void collision() {
 	//  FIXING THE ROW AND COMPARE THE SIGNATURE DOWNWARD, SAME AS FINDING DIA NEIGHBOUR
 	int i = 0;
 	int j = i + 1;
-#pragma omp parallel for firstprivate(i,j) shared(NUM_OF_BLOCK)
-	for (  i =0  ; i < NUM_OF_BLOCK - 1; i++) {
-		for (  j = i+1; j <= NUM_OF_BLOCK - 1; j++) {
+	//#pragma omp parallel for private(j)
+	for (i = 0; i < NUM_OF_BLOCK - 1; i++) {
+		for (j = i + 1; j <= NUM_OF_BLOCK - 1; j++) {
 			if ((Big_Block[i].signature == Big_Block[j].signature) && (Big_Block[i].col_index != Big_Block[j].col_index)) {
 				printf("Block %d from Col %d and Block %d from Col %d collide\n", i, Big_Block[i].col_index, j, Big_Block[j].col_index);
-				printf("Row Index From Block %d: %d %d %d %d \n", i, Big_Block[i].row1, Big_Block[i].row2, Big_Block[i].row3, Big_Block[i].row4);
-				printf("Row Index From Block %d: %d %d %d %d \n", j, Big_Block[j].row1, Big_Block[j].row2, Big_Block[j].row3, Big_Block[j].row4);
+				//	printf("Row Index From Block %d: %d %d %d %d \n", i, Big_Block[i].row1, Big_Block[i].row2, Big_Block[i].row3, Big_Block[i].row4);
+				//	printf("Row Index From Block %d: %d %d %d %d \n", j, Big_Block[j].row1, Big_Block[j].row2, Big_Block[j].row3, Big_Block[j].row4);
 
 			}
 			else {
@@ -265,6 +289,7 @@ void collision() {
 			}
 		}
 	}
+	printf("Inside the collision funciton, the number of block is %d\n", NUM_OF_BLOCK);
 }
 
 
@@ -272,7 +297,7 @@ double** readMatrix(char* fileName) {
 
 	FILE *fp;
 	int i, j;
-	char s[MAX], ch="";
+	char s[MAX], ch = "";
 
 	if ((fp = fopen(fileName, "r")) == NULL) {
 		printf("can not open this file!\n");
@@ -335,44 +360,56 @@ int main(void) {
 
 	readKey("keys.txt");
 	double** jz = readMatrix("data.txt");
-
+	int j = 0;
 	int i = 0;
-	#pragma omp parallel for firstprivate(i)
-		for (i = 0; i < 499; i++) {  //423 & 499 broken
+	int k = 0;
+
+
+
+	//#pragma omp parallel for firstprivate(i) shared(Big_Block,NUM_OF_BLOCK,SIZE_OF_COLLECTION,b)
+
+	#pragma omp parallel for
+	for (i = 0; i < 499; i++) {
 
 		printf("THIS IS COLUMN %d\n", i);
 
 		double*c = readCol(jz, i, 4400);
-		int j = 0;
-		 #pragma omp parallel for firstprivate(j)
-		for ( j = 0; j < 4400; j++) {
-
-			// printf("This is fixed row %d !!!!!!!!!!\n",j);
-			int* one_collection = collection(c, j, 4400);
-
-			// MODIFY THE DYMANIC ALLOCATION OF SPACES (SIZE_OF_COMBINATION) IN combNonRec() function.
-
-			if (get_combination_size(SIZE_OF_COLLECTION, M) >= 4) {
-				//GET THE 2D-ARRAY OF COMBINATION
-				int** rrr = combNonRec(one_collection, SIZE_OF_COLLECTION, M);
-
-				for (int ii = 0; ii < get_combination_size(SIZE_OF_COLLECTION, M); ii++) {
-					create_Block(rrr[ii], i);  // first arg: int[] ; second arg: col_number;
-					add_To_Block_Collection();
-					// printf("\n");
-				}
-
-				free(rrr);
-			}
 
 
-			 free(one_collection);
+
+		#pragma omp parallel for shared(i)
+		for (j = 0; j < 4400; j++) {
+			// printf("This is fixed row %d from column %d !!!!!!!!!!\n",j,i);
+			collection(c, i, j, 4400);
 		}
 
-		//OpenMP for j
 		free(c);
+
 	}
-	// OpenMP for i
+	printf("NUM_OF_DIA_SET is %d\n", NUM_OF_DIA_SET);
+	/*BLOCK GENERATION*/
+
+
+
+	int dia_size = 0;
+
+#pragma omp parallel for shared(NUM_OF_DIA_SET)
+	for (dia_size = 0; dia_size < NUM_OF_DIA_SET; dia_size++)
+	{
+		int size = dias[dia_size].size;
+		//GET THE 2D-ARRAY OF COMBINATION
+		int** rrr = combNonRec(dias[dia_size].collection, dias[dia_size].size, M);
+		#pragma omp parallel for  shared(NUM_OF_DIA_SET,dia_size)
+		for (j = 0; j < get_combination_size(dias[dia_size].size, M); j++) {
+			create_Block(rrr[j], size);   //ACTUAL CREATION OF BLOCK !!!!!!!
+			//printf("This is block %d \n", NUM_OF_BLOCK);
+			add_To_Block_Collection();
+
+		}
+		free(rrr);
+	}
+
+
 	collision();
 
 
@@ -380,9 +417,14 @@ int main(void) {
 	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 	printf("Total time spent : %f\n", time_spent);
 
+	printf("The size of block is %d", NUM_OF_BLOCK);
 
-
-
+	free(jz);
+	free(one_dia_set.collection);
+	free(Big_Block);
+	free(KEYS);
+	free(dias);
+	exit(0);
 
 }
 
