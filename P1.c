@@ -44,11 +44,7 @@ int NUM_OF_BLOCK = 0;       //  TOTAL NUMBER OF BLOCK
 int SIZE_OF_COLLECTION=0;     // SIZE OF SET FOR COMBINATION CALCULATION N choose M
 //int SIZE_OF_COMBINATION = 1;    // SIZE OF COMBINATION nCm
 
-/*
-int queue[4400] = {0} ;           // THE TEMPERORY ARRAY THAT STORE THE INSTANCE OF THE CONBINATION
-int result[M] = {0};        // THE ARRAY THAT SAVE THE RESULT OF ONE COMBINATION
-int top = 0;                // THE POINTER OF RECURSION
-*/
+
 
 void readKey(char* fileName){
 
@@ -105,7 +101,7 @@ int* collection(double* one_column, int start,int row_size){
 
 	 collection_for_one_row[0] = start;
 
-	 for(int i = start; i < row_size-1; i++){
+	 for(int i = start; i < row_size-2; i++){
      // START is the benchmark of the dia checking operation
      //i.e. fixing START and find the DIA down the row
      // Put itself in a collection e.g. {START, START+1,START+2 ...}
@@ -122,16 +118,6 @@ int* collection(double* one_column, int start,int row_size){
 	// printf("Inside the collection function, what is the SIZE_OF_COLLECTION? %d\n",SIZE_OF_COLLECTION);
 
 
-/*
-	 if(size_of_set > 4){
-		 for(int i=0;i<size_of_set;i++){
-			 printf("%d ",collection_for_one_row[i]);
-		 }
-		 printf("\n");
-
-	 }
-
-	 */
 	 return collection_for_one_row;
  }
 
@@ -188,19 +174,6 @@ int* collection(double* one_column, int start,int row_size){
 
 	 free(p);
 
-/*
-    for(int i=0;i<size_of_combination;i++)
-    {
-         printf("List %d:\n",i);
-        for(int j=0;j<4;j++)
-        {
-            printf("%d ",finalR[i][j]);
-        }
-         printf("\n");
-         printf("\n");
-    }
-
-    */
      return finalR;
  }
 
@@ -249,11 +222,9 @@ void collision(){
         for(int j = i + 1; j <= NUM_OF_BLOCK - 1; j++){
             if((Big_Block[i].signature == Big_Block[j].signature)  && (Big_Block[i].col_index != Big_Block[j].col_index)){
                 printf("Block %d from Col %d and Block %d from Col %d collide\n",i,Big_Block[i].col_index,j,Big_Block[j].col_index);
-                printf("Row Index From Block %d: %d %d %d %d \n",i,Big_Block[i].row1,Big_Block[i].row2,Big_Block[i].row3,Big_Block[i].row4);
-                printf("Row Index From Block %d: %d %d %d %d \n",j,Big_Block[j].row1,Big_Block[j].row2,Big_Block[j].row3,Big_Block[j].row4);
+               // printf("Row Index From Block %d: %d %d %d %d \n",i,Big_Block[i].row1,Big_Block[i].row2,Big_Block[i].row3,Big_Block[i].row4);
+              //  printf("Row Index From Block %d: %d %d %d %d \n",j,Big_Block[j].row1,Big_Block[j].row2,Big_Block[j].row3,Big_Block[j].row4);
 
-            }else{
-               // printf("No collision Happens for Block %d and Block %d \n",i,j);
             }
         }
     }
@@ -370,7 +341,7 @@ int main(void) {
 
 		clock_t end = clock();
 		double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-		printf("Total time spent : %lf\n",time_spent);
+		printf("Total time spent : %f\n",time_spent);
 
 
 
