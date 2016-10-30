@@ -17,7 +17,7 @@
 #define MAX 1000000  //one row of double = sizeof(Double) *4400
 #define ROW_SIZE 4400
 #define COL_SIZE 500
-#define DIA 0.0000011
+#define DIA 0.0000015
 #define M  4        // SIZE OF COMBINATION
 
 /** individual block **/
@@ -43,11 +43,11 @@ long long* KEYS;   //GLOBAL KEY STORAGE
 struct block b;             //  RECYCLCABLE SINGLE BLOCK
 struct block* Big_Block;    //  THE COLLECTION OF ALL BLOCK
 int NUM_OF_BLOCK = 0;       //  TOTAL NUMBER OF BLOCK
-int BLOCK_INDEX = 0;			//  MALLOC SIZE OF BLOCK
+int MEM_SIZE = 1;			//  MALLOC SIZE OF BLOCK
 
 
 
-								//  GLOBAL VARIABLE USED FOR DIA SET
+							//  GLOBAL VARIABLE USED FOR DIA SET
 struct DIA_SET one_dia_set;
 struct DIA_SET dias[100000];			//  THE COLLECTION OF ALL DIA SET
 int NUM_OF_DIA_SET = 0;
@@ -182,8 +182,8 @@ void collection(double* one_column, int col_num, int start, int row_size) {
 	collection_for_one_row[0] = start;
 
 	int i = start;
-	#pragma omp parallel for shared(collection_for_one_row)
-	for (i=start; i < row_size - 2; i++) {
+#pragma omp parallel for shared(collection_for_one_row)
+	for (i = start; i < row_size - 2; i++) {
 		// START is the benchmark of the dia checking operation
 		//i.e. fixing START and find the DIA down the row
 		// Put itself in a collection e.g. {START, START+1,START+2 ...}
@@ -196,7 +196,7 @@ void collection(double* one_column, int col_num, int start, int row_size) {
 		}
 	}
 
-	//SIZE_OF_COLLECTION = size_of_set;  // MODIFY THE ARRAY SIZE N FOR COMBINATION.
+
 	// printf("Inside the collection function, what is the SIZE_OF_COLLECTION? %d\n",SIZE_OF_COLLECTION);
 	if (size_of_set >= 4)
 	{
@@ -209,11 +209,12 @@ void collection(double* one_column, int col_num, int start, int row_size) {
 void add_to_dia_set(int* collection, int col_number, int size)
 {
 	//SEQUENTIAL ACCESS
+	NUM_OF_DIA_SET++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
 	one_dia_set.col_index = col_number;
 	one_dia_set.collection = collection;
 	one_dia_set.size = size;
-	dias[NUM_OF_DIA_SET] = one_dia_set; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
-	NUM_OF_DIA_SET++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
+	dias[NUM_OF_DIA_SET-1] = one_dia_set; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
+	
 }
 
 
@@ -298,10 +299,34 @@ void create_Block(int arr[], int COL_INDEX) {
 
 /** RECYCLING THE GLOBAL STRUCT B **/
 void add_To_Block_Collection() {
+	//FIRST ALLOCATION
+	if (NUM_OF_BLOCK == 0) {
+		if ((Big_Block = (struct block*) calloc(MEM_SIZE, sizeof(struct block))) != NULL) {
+			Big_Block[NUM_OF_BLOCK] = b;// STORE THE INSTANCE OF BLOCK INTO THE COLLECTION , b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
+			NUM_OF_BLOCK++;
+		}
+		else {
+			printf("First calloc unsuccessful\n");
+		}
+	}
 
-	Big_Block[BLOCK_INDEX] = b; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
-								//BLOCK_INDEX++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
+	else if (NUM_OF_BLOCK == MEM_SIZE) {
+		//SEQUENTIAL ACCESS
+		MEM_SIZE = MEM_SIZE * 2;
+		if ((Big_Block = (struct block*)realloc(Big_Block, MEM_SIZE * sizeof(struct block))) != NULL) {
+			Big_Block[NUM_OF_BLOCK] = b;
+			NUM_OF_BLOCK++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
+		}
+		else {
+			printf("Realloc failed\n");
+			exit(1);
+		}
+	}
 
+	else {
+		Big_Block[NUM_OF_BLOCK] = b; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
+		NUM_OF_BLOCK++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
+	}
 }
 
 
@@ -353,6 +378,7 @@ int main(void) {
 		double*c = readCol(jz, i, 4400);
 
 
+
 #pragma omp parallel for shared(i)
 		for (j = 0; j < 4400; j++) {
 			// printf("This is fixed row %d from column %d !!!!!!!!!!\n",j,i);
@@ -369,62 +395,24 @@ int main(void) {
 
 	int dia_order = 0;
 
-#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK) 
+#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,MEM_SIZE) 
 	for (dia_order = 0; dia_order < NUM_OF_DIA_SET; dia_order++)
 	{
 		int size = dias[dia_order].size;
-		int combination_size = get_combination_size(dias[dia_order].size, M);
 		//GET THE 2D-ARRAY OF COMBINATION
-#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,dia_order,combination_size)
-		for (k = 0; k < combination_size; k++) {
+		int** rrr = combNonRec(dias[dia_order].collection, dias[dia_order].size, M);
+#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,MEM_SIZE,dia_order)
+		for (k = 0; k < get_combination_size(dias[dia_order].size, M); k++) {
 			// FIRST ROUND : CALCULATE THE TOTAL NUMBER OF BLOCK AND THE ALLOCATE THE SPACE ACCORDINGLY
-#pragma omp atomic
-			NUM_OF_BLOCK++;
-		}
-	}
 
-	printf("NUM_OF_BLOCK is %d\n", NUM_OF_BLOCK);
-
-
-	int second = 0;
-	int l = 0;
-	// SECOND ROUND : ALLOCATE THE TOTAL NUMBER OF BLOCK AT ONCE
-
-
-	if ((Big_Block = (struct block*)calloc(NUM_OF_BLOCK, sizeof(struct block))) != NULL)
-	{
-		for (second = 0; second < NUM_OF_DIA_SET; second++)
-		{
-			int** rrr = combNonRec(dias[second].collection, dias[second].size, M);
-
-
-#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,dia_order,BLOCK_INDEX)
-
-			for (l = 0; l < get_combination_size(dias[second].size, M); l++) {
 #pragma omp critical
-				{
-					create_Block(rrr[l], dias[second].col_index);   //ACTUAL CREATION OF BLOCK !!!!!!!
-					add_To_Block_Collection();
-					//printf("This is block %d\n", BLOCK_INDEX);
-					//#pragma omp atomic
-					BLOCK_INDEX++;
-
-				}
+			{
+				create_Block(rrr[k], dias[dia_order].col_index);   //ACTUAL CREATION OF BLOCK !!!!!!!
+				add_To_Block_Collection();
 			}
-
-			free(rrr);
 		}
+		free(rrr);
 	}
-
-	else {
-		printf("Calloc for big_Block fails\n");
-		exit(1);
-	}
-
-
-
-
-
 
 	collision();
 
@@ -440,7 +428,6 @@ int main(void) {
 	exit(0);
 
 }
-
 
 
 
