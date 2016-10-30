@@ -17,7 +17,7 @@
 #define MAX 1000000  //one row of double = sizeof(Double) *4400
 #define ROW_SIZE 4400
 #define COL_SIZE 500
-#define DIA 0.0000011
+#define DIA 0.0000015
 #define M  4        // SIZE OF COMBINATION
 
 /** individual block **/
@@ -196,7 +196,7 @@ void collection(double* one_column, int col_num, int start, int row_size) {
 		}
 	}
 
-	
+
 	// printf("Inside the collection function, what is the SIZE_OF_COLLECTION? %d\n",SIZE_OF_COLLECTION);
 	if (size_of_set >= 4)
 	{
@@ -209,11 +209,12 @@ void collection(double* one_column, int col_num, int start, int row_size) {
 void add_to_dia_set(int* collection, int col_number, int size)
 {
 	//SEQUENTIAL ACCESS
+	NUM_OF_DIA_SET++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
 	one_dia_set.col_index = col_number;
 	one_dia_set.collection = collection;
 	one_dia_set.size = size;
-	dias[NUM_OF_DIA_SET] = one_dia_set; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
-	NUM_OF_DIA_SET++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
+	dias[NUM_OF_DIA_SET - 1] = one_dia_set; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
+
 }
 
 
