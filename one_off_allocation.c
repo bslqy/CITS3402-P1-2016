@@ -17,7 +17,7 @@
 #define MAX 1000000  //one row of double = sizeof(Double) *4400
 #define ROW_SIZE 4400
 #define COL_SIZE 500
-#define DIA 0.0000015
+#define DIA 0.0000011
 #define M  4        // SIZE OF COMBINATION
 
 /** individual block **/
@@ -47,7 +47,7 @@ int BLOCK_INDEX = 0;			//  MALLOC SIZE OF BLOCK
 
 
 
-							//  GLOBAL VARIABLE USED FOR DIA SET
+								//  GLOBAL VARIABLE USED FOR DIA SET
 struct DIA_SET one_dia_set;
 struct DIA_SET dias[100000];			//  THE COLLECTION OF ALL DIA SET
 int NUM_OF_DIA_SET = 0;
@@ -182,13 +182,14 @@ void collection(double* one_column, int col_num, int start, int row_size) {
 	collection_for_one_row[0] = start;
 
 	int i = start;
-	//#pragma omp parallel for firstprivate(i) shared(collection_for_one_row)
-	for (i; i < row_size - 2; i++) {
+	#pragma omp parallel for shared(collection_for_one_row)
+	for (i=start; i < row_size - 2; i++) {
 		// START is the benchmark of the dia checking operation
 		//i.e. fixing START and find the DIA down the row
 		// Put itself in a collection e.g. {START, START+1,START+2 ...}
 
 		if (fabs(one_column[start] - one_column[i + 1]) < DIA) {    //If two row are in the same DIA  //Put the row index in an array
+#pragma atomic
 			size_of_set++;
 			collection_for_one_row = (int*)realloc(collection_for_one_row, size_of_set * sizeof(int)); //Resize the array, increase by one.
 			collection_for_one_row[size_of_set - 1] = i + 1; // Add the index of the neighbour into the collection array.
@@ -298,9 +299,9 @@ void create_Block(int arr[], int COL_INDEX) {
 /** RECYCLING THE GLOBAL STRUCT B **/
 void add_To_Block_Collection() {
 
-		Big_Block[BLOCK_INDEX] = b; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
-		//BLOCK_INDEX++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
-	
+	Big_Block[BLOCK_INDEX] = b; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
+								//BLOCK_INDEX++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
+
 }
 
 
@@ -313,7 +314,7 @@ void collision() {
 
 #pragma omp parallel for shared(NUM_OF_BLOCK,num_of_collision)
 	for (i = 0; i < NUM_OF_BLOCK - 1; i++) {
-		#pragma omp parallel for shared(NUM_OF_BLOCK,i,num_of_collision)
+#pragma omp parallel for shared(NUM_OF_BLOCK,i,num_of_collision)
 		for (j = i + 1; j <= NUM_OF_BLOCK - 1; j++) {
 			if ((Big_Block[i].signature == Big_Block[j].signature) && (Big_Block[i].col_index != Big_Block[j].col_index)) {
 				//printf("Block %d from Col %d and Block %d from Col %d collide\n", i, Big_Block[i].col_index, j, Big_Block[j].col_index);
@@ -344,7 +345,7 @@ int main(void) {
 	int i = 0;
 	int k = 0;
 
-	#pragma omp parallel for
+#pragma omp parallel for
 	for (i = 0; i < 499; i++) {
 
 		printf("THIS IS COLUMN %d\n", i);
@@ -352,7 +353,7 @@ int main(void) {
 		double*c = readCol(jz, i, 4400);
 
 
-		#pragma omp parallel for shared(i)
+#pragma omp parallel for shared(i)
 		for (j = 0; j < 4400; j++) {
 			// printf("This is fixed row %d from column %d !!!!!!!!!!\n",j,i);
 			collection(c, i, j, 4400);
@@ -368,7 +369,7 @@ int main(void) {
 
 	int dia_order = 0;
 
-	#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK) 
+#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK) 
 	for (dia_order = 0; dia_order < NUM_OF_DIA_SET; dia_order++)
 	{
 		int size = dias[dia_order].size;
@@ -387,10 +388,10 @@ int main(void) {
 
 	int second = 0;
 	int l = 0;
-		// SECOND ROUND : ALLOCATE THE TOTAL NUMBER OF BLOCK AT ONCE
+	// SECOND ROUND : ALLOCATE THE TOTAL NUMBER OF BLOCK AT ONCE
 
 
-	if ((Big_Block = (struct block*)calloc(NUM_OF_BLOCK, sizeof(struct block))) != NULL) 
+	if ((Big_Block = (struct block*)calloc(NUM_OF_BLOCK, sizeof(struct block))) != NULL)
 	{
 		for (second = 0; second < NUM_OF_DIA_SET; second++)
 		{
@@ -399,18 +400,18 @@ int main(void) {
 
 #pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,dia_order,BLOCK_INDEX)
 
-				for (l = 0; l < get_combination_size(dias[second].size, M); l++) {
-					#pragma omp critical
-									{
+			for (l = 0; l < get_combination_size(dias[second].size, M); l++) {
+#pragma omp critical
+				{
 					create_Block(rrr[l], dias[second].col_index);   //ACTUAL CREATION OF BLOCK !!!!!!!
 					add_To_Block_Collection();
 					//printf("This is block %d\n", BLOCK_INDEX);
-//#pragma omp atomic
+					//#pragma omp atomic
 					BLOCK_INDEX++;
 
-					}
 				}
-			
+			}
+
 			free(rrr);
 		}
 	}
@@ -419,11 +420,11 @@ int main(void) {
 		printf("Calloc for big_Block fails\n");
 		exit(1);
 	}
-	
 
 
-				
-		
+
+
+
 
 	collision();
 
