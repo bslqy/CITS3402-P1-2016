@@ -335,6 +335,7 @@ void collision() {
 	int j = i + 1;
 	int num_of_collision = 0;
 
+#pragma omp parallel for shared(NUM_OF_BLOCK,num_of_collision)
 	for (i = 0; i < NUM_OF_BLOCK - 1; i++) {
 		#pragma omp parallel for shared(NUM_OF_BLOCK,i,num_of_collision)
 		for (j = i + 1; j <= NUM_OF_BLOCK - 1; j++) {
@@ -359,9 +360,6 @@ void collision() {
 
 
 int main(void) {
-
-
-
 	clock_t begin = clock();
 
 	readKey("keys.txt");
@@ -369,10 +367,6 @@ int main(void) {
 	int j = 0;
 	int i = 0;
 	int k = 0;
-
-
-
-	
 
 	#pragma omp parallel for
 	for (i = 0; i < 499; i++) {
@@ -393,10 +387,7 @@ int main(void) {
 
 	}
 
-
 	printf("NUM_OF_DIA_SET is %d\n", NUM_OF_DIA_SET);
-
-
 
 	/*BLOCK GENERATION*/
 
@@ -410,16 +401,16 @@ int main(void) {
 		int** rrr = combNonRec(dias[dia_order].collection, dias[dia_order].size, M);
 		#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,MEM_SIZE,dia_order)
 		for (k = 0; k < get_combination_size(dias[dia_order].size, M); k++) {
+			// FIRST ROUND : CALCULATE THE TOTAL NUMBER OF BLOCK AND THE ALLOCATE THE SPACE ACCORDINGLY
+
 #pragma omp critical
-			{
+			{	
 				create_Block(rrr[k], dias[dia_order].col_index);   //ACTUAL CREATION OF BLOCK !!!!!!!
 				add_To_Block_Collection();
 			}
 		}
 		free(rrr);
 	}
-
-
 
 	collision();
 
