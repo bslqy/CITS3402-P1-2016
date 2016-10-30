@@ -17,7 +17,7 @@
 #define MAX 1000000  //one row of double = sizeof(Double) *4400
 #define ROW_SIZE 4400
 #define COL_SIZE 500
-#define DIA 0.000001
+#define DIA 0.0000011
 #define M  4        // SIZE OF COMBINATION
 
 /** individual block **/
@@ -182,20 +182,21 @@ void collection(double* one_column, int col_num, int start, int row_size) {
 	collection_for_one_row[0] = start;
 
 	int i = start;
-	//#pragma omp parallel for firstprivate(i) shared(collection_for_one_row)
-	for (i; i < row_size - 2; i++) {
+#pragma omp parallel for shared(collection_for_one_row)
+	for (i = start; i < row_size - 2; i++) {
 		// START is the benchmark of the dia checking operation
 		//i.e. fixing START and find the DIA down the row
 		// Put itself in a collection e.g. {START, START+1,START+2 ...}
 
 		if (fabs(one_column[start] - one_column[i + 1]) < DIA) {    //If two row are in the same DIA  //Put the row index in an array
+#pragma atomic
 			size_of_set++;
 			collection_for_one_row = (int*)realloc(collection_for_one_row, size_of_set * sizeof(int)); //Resize the array, increase by one.
 			collection_for_one_row[size_of_set - 1] = i + 1; // Add the index of the neighbour into the collection array.
 		}
 	}
 
-	//SIZE_OF_COLLECTION = size_of_set;  // MODIFY THE ARRAY SIZE N FOR COMBINATION.
+	
 	// printf("Inside the collection function, what is the SIZE_OF_COLLECTION? %d\n",SIZE_OF_COLLECTION);
 	if (size_of_set >= 4)
 	{
@@ -337,7 +338,7 @@ void collision() {
 
 #pragma omp parallel for shared(NUM_OF_BLOCK,num_of_collision)
 	for (i = 0; i < NUM_OF_BLOCK - 1; i++) {
-		#pragma omp parallel for shared(NUM_OF_BLOCK,i,num_of_collision)
+#pragma omp parallel for shared(NUM_OF_BLOCK,i,num_of_collision)
 		for (j = i + 1; j <= NUM_OF_BLOCK - 1; j++) {
 			if ((Big_Block[i].signature == Big_Block[j].signature) && (Big_Block[i].col_index != Big_Block[j].col_index)) {
 				//printf("Block %d from Col %d and Block %d from Col %d collide\n", i, Big_Block[i].col_index, j, Big_Block[j].col_index);
@@ -368,7 +369,7 @@ int main(void) {
 	int i = 0;
 	int k = 0;
 
-	#pragma omp parallel for
+#pragma omp parallel for
 	for (i = 0; i < 499; i++) {
 
 		printf("THIS IS COLUMN %d\n", i);
@@ -377,7 +378,7 @@ int main(void) {
 
 
 
-		#pragma omp parallel for shared(i)
+#pragma omp parallel for shared(i)
 		for (j = 0; j < 4400; j++) {
 			// printf("This is fixed row %d from column %d !!!!!!!!!!\n",j,i);
 			collection(c, i, j, 4400);
@@ -393,18 +394,18 @@ int main(void) {
 
 	int dia_order = 0;
 
-	#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,MEM_SIZE) 
+#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,MEM_SIZE) 
 	for (dia_order = 0; dia_order < NUM_OF_DIA_SET; dia_order++)
 	{
 		int size = dias[dia_order].size;
 		//GET THE 2D-ARRAY OF COMBINATION
 		int** rrr = combNonRec(dias[dia_order].collection, dias[dia_order].size, M);
-		#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,MEM_SIZE,dia_order)
+#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK,MEM_SIZE,dia_order)
 		for (k = 0; k < get_combination_size(dias[dia_order].size, M); k++) {
 			// FIRST ROUND : CALCULATE THE TOTAL NUMBER OF BLOCK AND THE ALLOCATE THE SPACE ACCORDINGLY
 
 #pragma omp critical
-			{	
+			{
 				create_Block(rrr[k], dias[dia_order].col_index);   //ACTUAL CREATION OF BLOCK !!!!!!!
 				add_To_Block_Collection();
 			}
