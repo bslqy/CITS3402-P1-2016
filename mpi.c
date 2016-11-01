@@ -37,7 +37,7 @@
 
 /** individual DIA_SET **/
 struct DIA_SET {
-	int* collection;
+	int collection[80];
 	int col_index;
 	int size;
 };
@@ -52,8 +52,8 @@ int BLOCK_INDEX = 0;			//  MALLOC SIZE OF BLOCK
 
 
 
-								//  GLOBAL VARIABLE USED FOR DIA SET
-struct DIA_SET one_dia_set;
+								//  GLOBAL VARIABLE USED FOR DIA SET (neighbours)
+struct DIA_SET one_dia_set; 
 struct DIA_SET dias[100000];			//  THE COLLECTION OF ALL DIA SET
 int NUM_OF_DIA_SET = 0;
 
@@ -178,31 +178,33 @@ double* readCol(double** jz, int col_number, int row_size) {
 	return col;
 }
 
-/** use to return a collection of DIA neighbours given a fixed row  */
+/** use to return a collection of DIA neighbours given a fixed row 
+	 START is the benchmark of the dia checking operation
+	 i.e. fixing START and find the DIA down the row
+	 
+*/
 void collection(double* one_column, int col_num, int start, int row_size) {
 	// Put itself in a collection e.g. {1}
 	int size_of_set = 1;
 	int* collection_for_one_row = malloc(size_of_set * sizeof(int));
-
 	collection_for_one_row[0] = start;
-
 	int i = start;
+
 #pragma omp parallel for shared(collection_for_one_row)
 	for (i = start; i < row_size - 2; i++) {
-		// START is the benchmark of the dia checking operation
-		//i.e. fixing START and find the DIA down the row
-		// Put itself in a collection e.g. {START, START+1,START+2 ...}
-
+		//Put itself in a collection e.g. {START, START+1,START+2 ...}
 		if (fabs(one_column[start] - one_column[i + 1]) < DIA) {    //If two row are in the same DIA  //Put the row index in an array
 #pragma atomic
 			size_of_set++;
 			collection_for_one_row = (int*)realloc(collection_for_one_row, size_of_set * sizeof(int)); //Resize the array, increase by one.
-			collection_for_one_row[size_of_set - 1] = i + 1; // Add the index of the neighbour into the collection array.
+			collection_for_one_row[size_of_set - 1] = i + 1; // Add the index of the neighbour into the dia array.
 		}
 	}
 
 	//SIZE_OF_COLLECTION = size_of_set;  // MODIFY THE ARRAY SIZE N FOR COMBINATION.
 	// printf("Inside the collection function, what is the SIZE_OF_COLLECTION? %d\n",SIZE_OF_COLLECTION);
+
+	//Only add to the big dias[10000] if the size if more than 4;
 	if (size_of_set >= 4)
 	{
 		add_to_dia_set(collection_for_one_row, col_num, size_of_set);
@@ -217,8 +219,8 @@ void add_to_dia_set(int* collection, int col_number, int size)
 	one_dia_set.col_index = col_number;
 	one_dia_set.collection = collection;
 	one_dia_set.size = size;
-	dias[NUM_OF_DIA_SET] = one_dia_set; // STORE THE INSTANCE OF BLOCK INTO THE COLLECTION, b IS THE RECYCLABLE BLOCK WHICH GETS FREED EVERYTIME
-	NUM_OF_DIA_SET++; //ADD ONE MORE BLOCK TO THE COLLECTION OF BLOCKS
+	dias[NUM_OF_DIA_SET] = one_dia_set; // STORE THE INSTANCE OF dia[] INTO THE dias[10000], one_dia_set is a placeholder which gets reused  
+	NUM_OF_DIA_SET++; //Increment the dia count
 }
 
 
@@ -230,7 +232,7 @@ int get_combination_size(int n, int m) {
 	return  floor(round(exp(lgamma(n + 1) - lgamma(n - m + 1)) / tgamma(m + 1)));
 }
 
-
+// Combination process. Input is an int[] with size >4 and the output is int[][4] with all the combinations
 int** combNonRec(int collect[], int sizeOfColl, int sizeOut) {
 
 
@@ -375,45 +377,82 @@ int main(void) {
 		
 		/* Send matrix data to the worker tasks */
 		avecol = COL_SIZE / numworkers;
-		extra = COL_SIZE%numworkers;
+		extra = COL_SIZE % numworkers;
 		offset = 0;
 		mtype = FROM_MASTER;
 		int dia_index = 0;
 
+
+		/* Create a DIA_SET structure */
+		const int nitems = ;
+		int          blocklengths[3] = { 80,1,1};
+		MPI_Datatype types[2] = { MPI_INT, MPI_INT, MPI_INT };
+		MPI_Datatype mpi_dia_set_type;
+		MPI_Aint     offsets[3];
+
+		offsets[0] = offsetof(car, shifts);
+		offsets[1] = offsetof(car, topSpeed);
+		offsets[2] = offsetof(car, topSpeed);
+
+		MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_car_type);
+		MPI_Type_commit(&mpi_car_type);
+
+
+
+
 		for (dest = 1; dest <= numworkers; dest++)
 		{
+			
 			cols = (dest <= extra) ? avecol + 1 : avecol;
 			printf("Sending %d cols to task %d offset=%d\n",
 				cols, dest, offset);
+
+			// CURRENT OFFSET 
 			MPI_Send(&offset, 1, MPI_INT, dest,
 				mtype, MPI_COMM_WORLD);
+
+			// HOW MANY COLS TO BE SENT TO EACH PROCESS?
 			MPI_Send(&cols, 1, MPI_INT, dest,
 				mtype, MPI_COMM_WORLD);
+
+			// ACTUAL DATA TO BE SENT
 			MPI_Send(&jz[0][offset], cols*ROW_SIZE, MPI_DOUBLE,
 				dest, mtype, MPI_COMM_WORLD);
 
+			/*
 			MPI_Send(&dia_index, 1, MPI_INT,
 				dest, mtype, MPI_COMM_WORLD);
-
+			*/
 			
 
 			offset = offset + cols;
 		}
+
+
 		/* Receive results from worker tasks */
 		mtype = FROM_WORKER;
 		for (i = 1; i <= numworkers; i++)
 		{
 			source = i;
+
+			// CURRENT OFFSET 
 			MPI_Recv(&offset, 1, MPI_INT, source, mtype,
 				MPI_COMM_WORLD, &status);
+
+			// HOW MANY COLS ALREADY PROCESSED?
 			MPI_Recv(&cols, 1, MPI_INT, source, mtype,
 				MPI_COMM_WORLD, &status);
 
-			MPI_Recv(&one_dia[dia_index], dia_size, MPI_DOUBLE,
-				source, mtype, MPI_COMM_WORLD, &status);
+			// WHAT IS THE NUM OF DIA IN EACH INDIVIDUAL PROCESS
+			MPI_Recv(&NUM_OF_DIA_SET, 1, MPI_INT, MASTER, mtype,
+				MPI_COMM_WORLD);
 
-			MPI_Recv(&dia_index, 1, MPI_INT,
+
+			// RECEIVE DIA ELEMENTS STARTING FROM THE INDEXD POSITION
+			MPI_Recv(&dias[dia_index],NUM_OF_DIA_SET, struct DIA_SET,
 				dest, mtype, MPI_COMM_WORLD);
+
+			dia_index += NUM_OF_DIA_SET; //Increase to dia_index to indicate the correct place in dias[10000];
 
 
 			printf("Received results from task %d\n", source);
@@ -431,7 +470,7 @@ int main(void) {
 			MPI_Recv(&offset, 1, MPI_INT, MASTER, mtype,
 				MPI_COMM_WORLD, &status);
 
-			//HOW MANY COLS TO FIND THE DIA?
+			//HOW MANY COLS TO PROCESS?
 			MPI_Recv(&cols, 1, MPI_INT, MASTER,
 				mtype, MPI_COMM_WORLD, &status);
 
@@ -448,25 +487,23 @@ int main(void) {
 			//Process the data
 //#pragma omp parallel for
 			for (int i = offset; i < offset+cols; i++) {
-
 				printf("THIS IS COLUMN %d\n", i);
-
 				double*c = readCol(jz, i, 4400);
-
 
 //#pragma omp parallel for shared(i)
 				for (j = 0; j < 4400; j++) {
 					// printf("This is fixed row %d from column %d !!!!!!!!!!\n",j,i);
 					collection(c, i, j, 4400);
 				}
-
 				free(c);
-
 			}
 
-
-
-
+			/* Three "variables in struct DIA_SET " are used 		
+			struct DIA_SET one_dia_set;
+			struct DIA_SET dias[100000];
+			int NUM_OF_DIA_SET = 0;	
+			*/
+		
 			mtype = FROM_WORKER;
 			MPI_Send(&offset, 1, MPI_INT, MASTER, mtype,
 				MPI_COMM_WORLD);
@@ -474,24 +511,20 @@ int main(void) {
 			MPI_Send(&cols, 1, MPI_INT, MASTER, mtype,
 				MPI_COMM_WORLD);
 
-			MPI_Send(&one_dia, dia_size, MPI_DOUBLE, MASTER,
+			MPI_Send(&dias, NUM_OF_DIA_SET, struct DIA_SET, MASTER,
 				mtype, MPI_COMM_WORLD);
 
-
-
+			MPI_Send(&NUM_OF_DIA_SET, 1, MPI_INT, MASTER, mtype,
+				MPI_COMM_WORLD);
 		}
 		MPI_Finalize();
 	
 	}
 	
-
-
-
-
 	int j = 0;
 	int i = 0;
 	int k = 0;
-
+	/*
 #pragma omp parallel for
 	for (i = 0; i < 499; i++) {
 
@@ -511,10 +544,12 @@ int main(void) {
 	}
 
 	printf("NUM_OF_DIA_SET is %d\n", NUM_OF_DIA_SET);
+	*/
+
 
 	/*BLOCK GENERATION*/
 
-	int dia_index = 0;
+	int dia_index = 0; // NOTE THAT dias[10000] is an array that holds all the relationships.
 #pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK) 
 
 	// FIRST ROUND : CALCULATE THE TOTAL NUMBER OF BLOCK AND THE ALLOCATE THE SPACE ACCORDINGLY
