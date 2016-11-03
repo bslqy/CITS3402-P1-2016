@@ -8,59 +8,59 @@
 *
 */
 
-												/* BREAKING INTO STEPS*/
+/* BREAKING INTO STEPS*/
 
 /* STEP 1	Reading and storing matrix
 
-			FUNCTION USED:
-			double** readMatrix(char* fileName);
-			void readKey(char* fileName);
+FUNCTION USED:
+double** readMatrix(char* fileName);
+void readKey(char* fileName);
 */
 
 /* STEP 2	Pick one column (First level of parellelization)
 
-			Function Used:	
-			double* readCol(double** jz, int col_number, int row_size);   OpenMP is used.
+Function Used:
+double* readCol(double** jz, int col_number, int row_size);   OpenMP is used.
 */
 
-/* STEP 3	Fixing one row	(Second level of parellelization) 
-			and try to find the int[] which contains the row index of a neighbourhood, the size and the col index
-			All the information are recording in struct DIA_SET one_dia_set (a placeholder) and then stored in struct DIA_SET dias[100000]
-			Information in the one_dia_set is overwritten when then next neighbourhood is found.
+/* STEP 3	Fixing one row	(Second level of parellelization)
+and try to find the int[] which contains the row index of a neighbourhood, the size and the col index
+All the information are recording in struct DIA_SET one_dia_set (a placeholder) and then stored in struct DIA_SET dias[100000]
+Information in the one_dia_set is overwritten when then next neighbourhood is found.
 
-			Function Used:
-			void collection(double* one_column, int col_num, int start, int row_size);  OpenMP is used.
-			void add_to_dia_set(int* collection, int col_number, int size);
-*/
-
-
-/* STEP 4	Iterate through the dias[100000] , used dias[index].collection(an int[] with size = dias[index].size )  to figure out 
-			all the combination for that int[]. 
-			The result will be an int[][4]. For example, {1,2,3,4,5} -> {{1,2,3,4},{1,2,3,5},{1,2,4,5},{2,1,3,4}....}
-			The int get_combination_size(int n, int m) function returns the number of combination.
-			Summing up all the combination size give the final NUM_OF_BLOCK;
-			Allocate the memory for struct block Big_Block once only. Reduce the likelyhood of realloc failure.
-
-			Function Used:
-			int get_combination_size(int n, int m);
-			int** combNonRec(int collect[], int sizeOfColl, int sizeOut);	   OpenMP is used.
-
-*/
-/* STEP 5	Creation of individual blocks by calculating the signature and then store it into struct Big_Blocks* 
-			In
-			
-			Function Used:
-			long long getKey(int row_index);
-			void create_Block(int arr[], int COL_INDEX);    OpenMP is used.
-			void add_To_Block_Collection();				
-
+Function Used:
+void collection(double* one_column, int col_num, int start, int row_size);  OpenMP is used.
+void add_to_dia_set(int* collection, int col_number, int size);
 */
 
 
-/* STEP 6	
-			Do the collision. Basically a Brute-force iteration. Fixing one block and matching downward. Total number of times will be N(N+1)/2
-			Function Used:
-			Collsion();   OpenMP is used.
+/* STEP 4	Iterate through the dias[100000] , used dias[index].collection(an int[] with size = dias[index].size )  to figure out
+all the combination for that int[].
+The result will be an int[][4]. For example, {1,2,3,4,5} -> {{1,2,3,4},{1,2,3,5},{1,2,4,5},{2,1,3,4}....}
+The int get_combination_size(int n, int m) function returns the number of combination.
+Summing up all the combination size give the final NUM_OF_BLOCK;
+Allocate the memory for struct block Big_Block once only. Reduce the likelyhood of realloc failure.
+
+Function Used:
+int get_combination_size(int n, int m);
+int** combNonRec(int collect[], int sizeOfColl, int sizeOut);	   OpenMP is used.
+
+*/
+/* STEP 5	Creation of individual blocks by calculating the signature and then store it into struct Big_Blocks*
+In
+
+Function Used:
+long long getKey(int row_index);
+void create_Block(int arr[], int COL_INDEX);    OpenMP is used.
+void add_To_Block_Collection();
+
+*/
+
+
+/* STEP 6
+Do the collision. Basically a Brute-force iteration. Fixing one block and matching downward. Total number of times will be N(N+1)/2
+Function Used:
+Collsion();   OpenMP is used.
 
 */
 
@@ -400,7 +400,7 @@ void collision() {
 /******** ======== *********/
 
 
-int main(int argc,char* argv[]) {
+int main(int argc, char* argv[]) {
 
 	clock_t begin = clock();
 
@@ -431,8 +431,8 @@ int main(int argc,char* argv[]) {
 
 	/* Create a DIA_SET structure */
 	const int nitems = 3;
-	int          blocklengths[3] = {80,1,1};
-	MPI_Datatype types[3] = {MPI_INT, MPI_INT, MPI_INT};
+	int          blocklengths[3] = { 80,1,1 };
+	MPI_Datatype types[3] = { MPI_INT, MPI_INT, MPI_INT };
 	MPI_Datatype mpi_dia_set_type;
 	MPI_Aint     offsets[3];
 
@@ -455,30 +455,28 @@ int main(int argc,char* argv[]) {
 		offset = 0;
 		mtype = FROM_MASTER;
 		int dia_index = 0;
-	
-=
 
-		for (dest = 1; dest <= numworkers; dest++)
-		{
+			for (dest = 1; dest <= numworkers; dest++)
+			{
 
-			cols = (dest <= extra) ? avecol + 1 : avecol;
-			printf("Sending %d cols to task %d offset=%d\n",
-				cols, dest, offset);
+				cols = (dest <= extra) ? avecol + 1 : avecol;
+				printf("Sending %d cols to task %d offset=%d\n",
+					cols, dest, offset);
 
-			// CURRENT OFFSET 
-			MPI_Send(&offset, 1, MPI_INT, dest,
-				mtype, MPI_COMM_WORLD);
+				// CURRENT OFFSET 
+				MPI_Send(&offset, 1, MPI_INT, dest,
+					mtype, MPI_COMM_WORLD);
 
-			// HOW MANY COLS TO BE SENT TO EACH PROCESS?
-			MPI_Send(&cols, 1, MPI_INT, dest,
-				mtype, MPI_COMM_WORLD);
+				// HOW MANY COLS TO BE SENT TO EACH PROCESS?
+				MPI_Send(&cols, 1, MPI_INT, dest,
+					mtype, MPI_COMM_WORLD);
 
-			// ACTUAL DATA TO BE SENT
-			MPI_Send(&jz[0][offset], cols*ROW_SIZE, MPI_DOUBLE,
-				dest, mtype, MPI_COMM_WORLD);
+				// ACTUAL DATA TO BE SENT
+				MPI_Send(&jz[0][offset], cols*ROW_SIZE, MPI_DOUBLE,
+					dest, mtype, MPI_COMM_WORLD);
 
-			offset = offset + cols;
-		}
+				offset = offset + cols;
+			}
 
 
 		/* Receive results from worker tasks */
@@ -497,19 +495,19 @@ int main(int argc,char* argv[]) {
 
 			// WHAT IS THE NUM OF DIA IN EACH INDIVIDUAL PROCESS
 			MPI_Recv(&NUM_OF_DIA_SET, 1, MPI_INT, MASTER, mtype,
-				MPI_COMM_WORLD,&status);
+				MPI_COMM_WORLD, &status);
 
 
 			// Receiving DIA_SET elements starting from 0, using an index to correclty fill the dias[100000]
 			MPI_Recv(&dias[dia_index], NUM_OF_DIA_SET, mpi_dia_set_type,
-				dest, mtype, MPI_COMM_WORLD,&status);
+				dest, mtype, MPI_COMM_WORLD, &status);
 
 			dia_index += NUM_OF_DIA_SET; //Increase to dia_index to indicate the correct place in dias[10000];
 
 
 			printf("Received results from task %d\n", source);
 		}
-	
+
 
 
 		/**************************** worker task ************************************/
@@ -531,7 +529,7 @@ int main(int argc,char* argv[]) {
 
 			//CURRENT dia_index
 			MPI_Recv(&dia_index, 1, MPI_INT,
-				dest, mtype, MPI_COMM_WORLD,&status);
+				dest, mtype, MPI_COMM_WORLD, &status);
 
 
 
@@ -556,18 +554,18 @@ int main(int argc,char* argv[]) {
 			*/
 
 			mtype = FROM_WORKER;
-			MPI_Send(&offset, 1, MPI_INT, MASTER, mtype,MPI_COMM_WORLD);
+			MPI_Send(&offset, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
 
-			MPI_Send(&cols, 1, MPI_INT, MASTER, mtype,MPI_COMM_WORLD);
+			MPI_Send(&cols, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
 
 			// Send the DIA_SET elements size to master so the master's dias[100000] could use an index to fill the incoming DIA_SET elements correctly
 			//The NUM_OF_DIA_SET is different from each process
 			MPI_Send(&NUM_OF_DIA_SET, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
 
 			//	Send the DIA_SET elements to the master's dia[100000] , with NUM_OF_DIA_SET equals to the individual process's calculation
-			MPI_Send(&dias, NUM_OF_DIA_SET, mpi_dia_set_type, MASTER,mtype, MPI_COMM_WORLD);
+			MPI_Send(&dias, NUM_OF_DIA_SET, mpi_dia_set_type, MASTER, mtype, MPI_COMM_WORLD);
 
-			
+
 		}
 		MPI_Finalize();
 
@@ -609,7 +607,7 @@ int main(int argc,char* argv[]) {
 				{
 					create_Block(rrr[k], dias[dia_index].col_index);   //ACTUAL CREATION OF BLOCK !!!!!!!
 					add_To_Block_Collection();							//ADD THE BLOCK INTO THE BIG_BLOCK
-					//printf("This is block %d\n", BLOCK_INDEX);
+																		//printf("This is block %d\n", BLOCK_INDEX);
 					BLOCK_INDEX++;										//Moinvg to the next empty space of BIG_BLOCK
 				}
 			}
