@@ -64,21 +64,6 @@
 
 */
 
-
-double** readMatrix(char* fileName);
-void readKey(char* fileName);
-double* readCol(double** jz, int col_number, int row_size);
-void collection(double* one_column, int col_num, int start, int row_size);
-void add_to_dia_set(int* collection, int col_number, int size);
-
-int get_combination_size(int n, int m);
-int** combNonRec(int collect[], int sizeOfColl, int sizeOut);
-long long getKey(int row_index);
-void create_Block(int arr[], int COL_INDEX);
-void add_To_Block_Collection();
-
-
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -111,7 +96,9 @@ struct DIA_SET {
 	int collection[80];
 	int col_index;
 	int size;
-}
+};
+
+
 
 long long* KEYS;   //GLOBAL KEY STORAGE
 
@@ -123,7 +110,7 @@ int BLOCK_INDEX = 0;			//  MALLOC SIZE OF BLOCK
 
 
 
-struct DIA_SET	one_dia_set;							//  GLOBAL VARIABLE USED FOR DIA SET (neighbours)
+struct DIA_SET one_dia_set;			//  GLOBAL VARIABLE USED FOR DIA SET (neighbours)
 struct DIA_SET dias[100000];			//  THE COLLECTION OF ALL DIA SET
 int NUM_OF_DIA_SET = 0;
 
@@ -413,7 +400,7 @@ void collision() {
 /******** ======== *********/
 
 
-int main(int argc, char *argv[]) {
+int main(int argc,char* argv[]) {
 
 	clock_t begin = clock();
 
@@ -449,9 +436,9 @@ int main(int argc, char *argv[]) {
 	MPI_Datatype mpi_dia_set_type;
 	MPI_Aint     offsets[3];
 
-	offsets[0] = offsetof(one_dia_set, shifts);
-	offsets[1] = offsetof(one_dia_set, topSpeed);
-	offsets[2] = offsetof(one_dia_set, topSpeed);
+	offsets[0] = offsetof(struct DIA_SET, collection);
+	offsets[1] = offsetof(struct DIA_SET, col_index);
+	offsets[2] = offsetof(struct DIA_SET, size);
 
 	MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_dia_set_type);
 	MPI_Type_commit(&mpi_dia_set_type);
@@ -469,8 +456,7 @@ int main(int argc, char *argv[]) {
 		mtype = FROM_MASTER;
 		int dia_index = 0;
 	
-
-
+=
 
 		for (dest = 1; dest <= numworkers; dest++)
 		{
@@ -511,12 +497,12 @@ int main(int argc, char *argv[]) {
 
 			// WHAT IS THE NUM OF DIA IN EACH INDIVIDUAL PROCESS
 			MPI_Recv(&NUM_OF_DIA_SET, 1, MPI_INT, MASTER, mtype,
-				MPI_COMM_WORLD);
+				MPI_COMM_WORLD,&status);
 
 
 			// Receiving DIA_SET elements starting from 0, using an index to correclty fill the dias[100000]
 			MPI_Recv(&dias[dia_index], NUM_OF_DIA_SET, mpi_dia_set_type,
-				dest, mtype, MPI_COMM_WORLD);
+				dest, mtype, MPI_COMM_WORLD,&status);
 
 			dia_index += NUM_OF_DIA_SET; //Increase to dia_index to indicate the correct place in dias[10000];
 
@@ -545,7 +531,7 @@ int main(int argc, char *argv[]) {
 
 			//CURRENT dia_index
 			MPI_Recv(&dia_index, 1, MPI_INT,
-				dest, mtype, MPI_COMM_WORLD);
+				dest, mtype, MPI_COMM_WORLD,&status);
 
 
 
@@ -586,10 +572,6 @@ int main(int argc, char *argv[]) {
 		MPI_Finalize();
 
 	}
-
-	int j = 0;
-	int i = 0;
-	int k = 0;
 
 
 	/*BLOCK GENERATION*/
@@ -654,6 +636,7 @@ int main(int argc, char *argv[]) {
 	exit(0);
 
 }
+
 
 
 
