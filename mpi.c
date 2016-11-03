@@ -107,11 +107,11 @@ struct block {
 };
 
 /** individual DIA_SET **/
-typedef struct DIA_SET {
+struct DIA_SET {
 	int collection[80];
 	int col_index;
 	int size;
-}one_dia_set;
+}
 
 long long* KEYS;   //GLOBAL KEY STORAGE
 
@@ -123,7 +123,7 @@ int BLOCK_INDEX = 0;			//  MALLOC SIZE OF BLOCK
 
 
 
-								//  GLOBAL VARIABLE USED FOR DIA SET (neighbours)
+struct DIA_SET	one_dia_set;							//  GLOBAL VARIABLE USED FOR DIA SET (neighbours)
 struct DIA_SET dias[100000];			//  THE COLLECTION OF ALL DIA SET
 int NUM_OF_DIA_SET = 0;
 
