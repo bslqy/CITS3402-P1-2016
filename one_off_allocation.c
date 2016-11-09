@@ -317,7 +317,7 @@ void collision() {
 		for (j = i + 1; j <= NUM_OF_BLOCK - 1; j++) {
 			if ((Big_Block[i].signature == Big_Block[j].signature) && (Big_Block[i].col_index != Big_Block[j].col_index)) {
 				//printf("Block %d from Col %d and Block %d from Col %d collide\n", i, Big_Block[i].col_index, j, Big_Block[j].col_index);
-#pragma omp atomic	
+#pragma omp atomic
 				num_of_collision++;
 				//	printf("Row Index From Block %d: %d %d %d %d \n", i, Big_Block[i].row1, Big_Block[i].row2, Big_Block[i].row3, Big_Block[i].row4);
 				//	printf("Row Index From Block %d: %d %d %d %d \n", j, Big_Block[j].row1, Big_Block[j].row2, Big_Block[j].row3, Big_Block[j].row4);
@@ -338,11 +338,27 @@ void collision() {
 int main(void) {
 	clock_t begin = clock();
 
+
+ /* STEP 1	Reading and storing matrix
+
+			FUNCTION USED:
+			double** readMatrix(char* fileName);
+			void readKey(char* fileName);
+   */
 	readKey("keys.txt");
 	double** jz = readMatrix("data.txt");
+
+
+
 	int j = 0;
 	int i = 0;
 	int k = 0;
+
+	/* STEP 2	Pick one column (First level of parellelization)
+
+			Function Used:
+			double* readCol(double** jz, int col_number, int row_size);   OpenMP is used.
+   */
 
 #pragma omp parallel for
 	for (i = 0; i < 499; i++) {
@@ -351,6 +367,17 @@ int main(void) {
 
 		double*c = readCol(jz, i, 4400);
 
+
+
+/* STEP 3	Fixing one row	(Second level of parellelization)
+			and try to find the int[] which contains the row index of a neighbourhood, the size and the col index
+			All the information are recording in struct DIA_SET one_dia_set (a placeholder) and then stored in struct DIA_SET dias[100000]
+			Information in the one_dia_set is overwritten when then next neighbourhood is found.
+
+			Function Used:
+			void collection(double* one_column, int col_num, int start, int row_size);  OpenMP is used.
+			void add_to_dia_set(int* collection, int col_number, int size);
+        */
 
 #pragma omp parallel for shared(i)
 		for (j = 0; j < 4400; j++) {
@@ -366,8 +393,20 @@ int main(void) {
 
 	/*BLOCK GENERATION*/
 
+
+/* STEP 4	Iterate through the dias[100000] , used dias[index].collection(an int[] with size = dias[index].size )  to figure out
+all the combination for that int[].
+The result will be an int[][4]. For example, {1,2,3,4,5} -> {{1,2,3,4},{1,2,3,5},{1,2,4,5},{2,1,3,4}....}
+The int get_combination_size(int n, int m) function returns the number of combination.
+Summing up all the combination size give the final NUM_OF_BLOCK;
+Allocate the memory for struct block Big_Block once only. Reduce the likely hood of realloc() failure.
+Function Used:
+int get_combination_size(int n, int m);
+int** combNonRec(int collect[], int sizeOfColl, int sizeOut);	   OpenMP is used.
+*/
+
 	int dia_index = 0;
-#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK) 
+#pragma omp parallel for shared(NUM_OF_DIA_SET,NUM_OF_BLOCK)
 
 	// FIRST ROUND : CALCULATE THE TOTAL NUMBER OF BLOCK AND THE ALLOCATE THE SPACE ACCORDINGLY
 	for (dia_index = 0; dia_index < NUM_OF_DIA_SET; dia_index++)
@@ -384,8 +423,16 @@ int main(void) {
 
 	printf("NUM_OF_BLOCK is %d\n", NUM_OF_BLOCK);
 
-	
+
 	// SECOND ROUND : ALLOCATE THE TOTAL NUMBER OF BLOCK AT ONCE
+
+	/* STEP 5	Creation of individual blocks by calculating the signature and then store it into struct Big_Blocks*
+In
+Function Used:
+long long getKey(int row_index);
+void create_Block(int arr[], int COL_INDEX);    OpenMP is used.
+void add_To_Block_Collection();
+*/
 	if ((Big_Block = (struct block*)calloc(NUM_OF_BLOCK, sizeof(struct block))) != NULL)
 	{
 		for (dia_index = 0; dia_index < NUM_OF_DIA_SET; dia_index++)
@@ -413,8 +460,13 @@ int main(void) {
 		exit(1);
 	}
 
-
+/* STEP 6
+Do the collision. Basically a Brute-force iteration. Fixing one block and matching downward. Total number of times will be N(N+1)/2
+Function Used:
+Collsion();   OpenMP is used.
+*/
 	collision();
+
 	clock_t end = clock();
 	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 	printf("Total time spent : %f\n", time_spent);
